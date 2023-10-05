@@ -30,13 +30,18 @@ let sortedTroves;
 
 window.addEventListener('load', async () => {
     if (typeof window.ethereum !== 'undefined') {
+        console.log('MetaMask is installed!');
         web3 = new Web3(window.ethereum);
-        userAccount = (await web3.eth.getAccounts())[0];
         lusdToken = new web3.eth.Contract(LUSD_TOKEN_ABI, LUSD_TOKEN_ADDRESS);
         troveManager = new web3.eth.Contract(TROVE_MANAGER_ABI, TROVE_MANAGER_ADDRESS);
         liquityPriceFeed = new web3.eth.Contract(LIQUITY_PRICE_FEED_ABI, LIQUITY_PRICE_FEED_ADDRESS);
         hintHelpers = new web3.eth.Contract(HINT_HELPERS_ABI, HINT_HELPERS_ADDRESS);
         sortedTroves = new web3.eth.Contract(SORTED_TROVES_ABI, SORTED_TROVES_ADDRESS);
+        // Check if accounts are already connected
+        const accounts = await web3.eth.getAccounts();
+        if (accounts.length > 0) {
+            userAccount = accounts[0];
+        }
     } else {
         alert("Please install or enable MetaMask.");
     }
@@ -44,7 +49,13 @@ window.addEventListener('load', async () => {
 
 document.getElementById('connectWallet').addEventListener('click', async () => {
     if (typeof window.ethereum !== 'undefined') {
-        userAccount = (await web3.eth.getAccounts())[0];
+        try {
+            // Request user's accounts
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            userAccount = accounts[0];
+        } catch (error) {
+            console.error('User denied account access');
+        }
     } else {
         alert("Please install or enable MetaMask.");
     }
@@ -77,15 +88,10 @@ document.getElementById('redeemLUSD').addEventListener('click', async () => {
             const prevPositionHint = prevAndNext[0];
             console.log(`Inserting after Trove: ${prevPositionHint}`);
 
-            const feeFloor = new BN(await troveManager.methods.REDEMPTION_FEE_FLOOR().call());
-            let maxFeePercentage;
-            if (truncatedLUSDamount.length > 3 + 18) {
-                maxFeePercentage = feeFloor.mul(new BN(7)).div(new BN(5));
-                console.log(`Redeeming above 1000 LUSD, set low max fee: ${maxFeePercentage}`);
-            } else {
-                maxFeePercentage = feeFloor.mul(new BN(77)).div(new BN(5));
-                console.log(`Redeeming below 1000 LUSD, set high max fee: ${maxFeePercentage}`);
-            }
+            const maxFeeInput = parseFloat(document.getElementById('maxFee').value);
+            const REDEMPTION_FEE_FLOOR = new web3.utils.BN(await troveManager.methods.REDEMPTION_FEE_FLOOR().call());
+            const maxFeePercentage = REDEMPTION_FEE_FLOOR.mul(new web3.utils.BN(maxFeeInput / 0.5));
+            console.log(`Max acceptable fee percentage set to: ${maxFeePercentage}`);
 
             await troveManager.methods.redeemCollateral(truncatedLUSDamount, firstRedemptionHint, prevPositionHint, ZERO_ADDRESS,
                     partialRedemptionHintNICR, MAX_ITERATIONS, maxFeePercentage).send({ from: userAccount });      

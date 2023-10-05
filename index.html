@@ -1,21 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Liquity LUSD Redeemer</title>
+    <style>
+        /* Style for dividers between sections */
+        .divider {
+            margin: 20px 0;
+            border-top: 1px solid #ccc;
+        }
+        /* Universal style for labels to make them have the same width */
+        label {
+            display: inline-block;
+            width: 150px; /* Adjust width as needed */
+        }
+    </style>
 </head>
+
 <body>
+
+    <!-- Connect Wallet Section -->
     <button id="connectWallet">Connect Wallet</button>
+    <div class="divider"></div>
+
+    <!-- Check LUSD Balance Section -->
     <button id="checkLUSDBalance">Check LUSD Balance</button>
     <div id="lusdBalance">LUSD Balance: 0</div>
+    <div class="divider"></div>
 
+    <!-- Redemption Section -->
     <label for="redeemAmount">Amount to Redeem:</label>
     <input type="number" id="redeemAmount" placeholder="Amount">
+    <br>
+
+    <label for="maxFee">Max Fee %:</label>
+    <input type="number" id="maxFee" placeholder="Max Fee %" value="0.7">
+    <br>
+    
     <button id="redeemLUSD">Redeem LUSD</button>
     <div id="transactionStatus"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bn.js/lib/bn.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js@1.x/dist/web3.min.js"></script>
     <script src="app.js"></script>
 </body>
