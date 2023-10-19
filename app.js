@@ -1,8 +1,8 @@
 const LUSD_TOKEN_ADDRESS = '0x5f98805A4E8be255a32880FDeC7F6728C6568bA0';
-const LUSD_TOKEN_ABI = [{"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"stateMutability":"view","type":"function"}];
+const LUSD_TOKEN_ABI = [{"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"}];
 
 const TROVE_MANAGER_ADDRESS = '0xA39739EF8b0231DbFA0DcdA07d7e29faAbCf4bb2';
-const TROVE_MANAGER_ABI = [{"constant":false,"inputs":[{"name":"_LUSDamount","type":"uint256"},{"name":"_firstRedemptionHint","type":"address"},{"name":"_upperPartialRedemptionHint","type":"address"},{"name":"_lowerPartialRedemptionHint","type":"address"},{"name":"_partialRedemptionHintNICR","type":"uint256"},{"name":"_maxIterations","type":"uint256"},{"name":"_maxFeePercentage","type":"uint256"}],"name":"redeemCollateral","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"REDEMPTION_FEE_FLOOR","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}];
+const TROVE_MANAGER_ABI = [{"constant":false,"inputs":[{"name":"_LUSDamount","type":"uint256"},{"name":"_firstRedemptionHint","type":"address"},{"name":"_upperPartialRedemptionHint","type":"address"},{"name":"_lowerPartialRedemptionHint","type":"address"},{"name":"_partialRedemptionHintNICR","type":"uint256"},{"name":"_maxIterations","type":"uint256"},{"name":"_maxFeePercentage","type":"uint256"}],"name":"redeemCollateral","outputs":[],"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"getRedemptionRateWithDecay","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"}]
 
 const LIQUITY_PRICE_FEED_ADDRESS = '0x4c517D4e2C851CA76d7eC94B805269Df0f2201De';
 const LIQUITY_PRICE_FEED_ABI = [{"constant":true,"inputs":[],"name":"fetchPrice","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"}];
@@ -27,6 +27,8 @@ let troveManager;
 let liquityPriceFeed;
 let hintHelpers;
 let sortedTroves;
+let lusdTotalSupply;
+let redemptionRate;
 
 window.addEventListener('load', async () => {
     if (typeof window.ethereum !== 'undefined') {
@@ -37,6 +39,8 @@ window.addEventListener('load', async () => {
         liquityPriceFeed = new web3.eth.Contract(LIQUITY_PRICE_FEED_ABI, LIQUITY_PRICE_FEED_ADDRESS);
         hintHelpers = new web3.eth.Contract(HINT_HELPERS_ABI, HINT_HELPERS_ADDRESS);
         sortedTroves = new web3.eth.Contract(SORTED_TROVES_ABI, SORTED_TROVES_ADDRESS);
+        lusdTotalSupply = new web3.utils.BN(await lusdToken.methods.totalSupply().call());
+        redemptionRate = new web3.utils.BN(await troveManager.methods.getRedemptionRateWithDecay().call());
         // Check if accounts are already connected
         const accounts = await web3.eth.getAccounts();
         if (accounts.length > 0) {
@@ -69,6 +73,16 @@ document.getElementById('checkLUSDBalance').addEventListener('click', async () =
     }
 });
 
+document.getElementById('redeemAmount').addEventListener('input', async () => {
+    if (userAccount) {
+        const redeemAmount = new web3.utils.BN(web3.utils.toWei(document.getElementById('redeemAmount').value, 'ether'));
+        const extraRate = redeemAmount.mul(new web3.utils.BN(web3.utils.toWei('0.5', 'ether'))).div(lusdTotalSupply);
+        console.log(`Current rate ${redemptionRate} plus our extra ${extraRate}`);
+        const maxFee = (parseFloat(web3.utils.fromWei(redemptionRate.add(extraRate), 'ether')) * 100.0 + 0.002).toFixed(3);
+        document.getElementById('maxFee').value = maxFee;
+    }
+});
+
 document.getElementById('redeemLUSD').addEventListener('click', async () => {
     if (userAccount) {
         const redeemAmount = web3.utils.toWei(document.getElementById('redeemAmount').value, 'ether');
@@ -88,9 +102,7 @@ document.getElementById('redeemLUSD').addEventListener('click', async () => {
             const prevPositionHint = prevAndNext[0];
             console.log(`Inserting after Trove: ${prevPositionHint}`);
 
-            const maxFeeInput = parseFloat(document.getElementById('maxFee').value);
-            const REDEMPTION_FEE_FLOOR = new web3.utils.BN(await troveManager.methods.REDEMPTION_FEE_FLOOR().call());
-            const maxFeePercentage = REDEMPTION_FEE_FLOOR.mul(new web3.utils.BN(maxFeeInput / 0.5));
+            const maxFeePercentage = web3.utils.toWei(document.getElementById('maxFee').value, 'ether');
             console.log(`Max acceptable fee percentage set to: ${maxFeePercentage}`);
 
             await troveManager.methods.redeemCollateral(truncatedLUSDamount, firstRedemptionHint, prevPositionHint, ZERO_ADDRESS,
